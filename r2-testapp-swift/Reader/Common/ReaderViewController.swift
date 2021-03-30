@@ -16,6 +16,7 @@ import R2Navigator
 import R2Shared
 import SwiftSoup
 import WebKit
+import MediaPlayer
 
 
 /// This class is meant to be subclassed by each publication format view controller. It contains the shared behavior, eg. navigation bar toggling.
@@ -26,6 +27,10 @@ class ReaderViewController: UIViewController, Loggable {
     let navigator: UIViewController & Navigator
     let publication: Publication
     let book: Book
+    var priorVolume: Float = 0.5
+    var background: Bool = false
+    
+    var volumeSlider: UISlider? = nil
 
     lazy var bookmarksDataSource: BookmarkDataSource? = BookmarkDataSource(bookID: book.id)
     
@@ -47,6 +52,7 @@ class ReaderViewController: UIViewController, Loggable {
         super.init(nibName: nil, bundle: nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(voiceOverStatusDidChange), name: Notification.Name(UIAccessibilityVoiceOverStatusChanged), object: nil)
+    
     }
 
     @available(*, unavailable)
@@ -57,6 +63,8 @@ class ReaderViewController: UIViewController, Loggable {
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
+
+// MARK - Jank Stuff to Move Pages with Volume Buttons
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -95,6 +103,76 @@ class ReaderViewController: UIViewController, Loggable {
             positionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             positionLabel.bottomAnchor.constraint(equalTo: navigator.view.bottomAnchor, constant: -20)
         ])
+        
+        
+        let systemVolumeView = MPVolumeView(frame: CGRect(x: -CGFloat.greatestFiniteMagnitude, y: 0, width: 0, height: 0))
+        self.view.addSubview(systemVolumeView)
+        let systemVolumeSlider = systemVolumeView.subviews.first(where:{ $0 is UISlider }) as? UISlider
+        volumeSlider = systemVolumeSlider
+        
+        priorVolume = systemVolumeSlider?.value ?? 0.5
+        systemVolumeSlider?.addTarget(self, action: #selector(volumeDidChange), for: .valueChanged)
+        
+        let notificationCenter = NotificationCenter.default
+        notificationCenter.addObserver(self, selector: #selector(appMovedToBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        notificationCenter.addObserver(self, selector: #selector(appMovedToForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+
+    
+    // MARK: - Jank Stuff To Page Down on Volume Down
+    @objc func volumeDidChange(sender: UISlider) {
+        // Handle volume change
+        
+        // Need to check for this, or the app will prevent changing volume
+        // when in the background. Oops
+        if background {
+            return
+        }
+        
+        
+        let newVolume = sender.value
+        if newVolume < priorVolume{
+            // must be volume up
+            navigator.goForward(animated: true)
+        }
+        else if newVolume > priorVolume{
+            // must be volume down
+            navigator.goBackward(animated: true)
+        }
+        
+        // makes sure the volume doesn't actually change
+        if (priorVolume == 0 || priorVolume == 1.0){
+            priorVolume = sender.value // sometimes priorVolume is set to 0; don't want to set it to that.
+        }
+        else {
+            sender.value = priorVolume
+        }
+        
+        jiggleVolume()
+    }
+    
+    // because the volume slider won't show up (and thus call the callback)
+    // if the volume is either max or min, this function makes it *slightly* not minimized
+    // or *slightly* not maximized
+    func jiggleVolume(){
+        if volumeSlider?.value == 0 {
+            volumeSlider?.value = 0.01
+        }
+        else if volumeSlider?.value == 1.0 {
+            volumeSlider?.value = 0.99
+        }
+    }
+    
+    @objc func appMovedToBackground(){
+        background = true
+        jiggleVolume()
+        priorVolume = volumeSlider?.value ?? 0.5
+    }
+    
+    @objc func appMovedToForeground(){
+        background = false
+        jiggleVolume()
+        priorVolume = volumeSlider?.value ?? 0.5
     }
     
     override func willMove(toParent parent: UIViewController?) {
