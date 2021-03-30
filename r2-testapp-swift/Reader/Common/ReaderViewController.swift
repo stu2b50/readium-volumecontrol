@@ -163,10 +163,21 @@ class ReaderViewController: UIViewController, Loggable {
         }
     }
     
+    // This way, at least, if you are at 0 volume, you'll be at 0 volume
+    // when the app is in the background. Less surprise.
+    func restoreMinMax(){
+        if volumeSlider?.value == 0.01 {
+            volumeSlider?.value = 0
+        }
+        else if volumeSlider?.value == 0.99 {
+            volumeSlider?.value = 1.0
+        }
+    }
+    
     @objc func appMovedToBackground(){
         background = true
-        jiggleVolume()
         priorVolume = volumeSlider?.value ?? 0.5
+        restoreMinMax()
     }
     
     @objc func appMovedToForeground(){

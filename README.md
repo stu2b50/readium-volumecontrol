@@ -1,3 +1,15 @@
+# Modifications
+
+This mods the Readium Mobile Test App to augment it with the ability to use the volume buttons to change pages. Modifying the behavior of the volume button is no bueno for apps released on the App Store, so this behavior is unfortunately missing in all iOS readers.
+
+To accomplish this, I make the volume slider invisible while inside the app. Then I listen to changes in the invisible slider, reacting to volume up by going to the previous page and vice versa for volume down.
+
+Because in iOS, the volume slider does not appear at 0 volume or 1.0 volume, I "jiggle" the volume by a small amount if the volume is at either extreme when switching to the app. So if you are muted, you will be at 0.01 volume while you're in the app.
+
+The "Readium Mobile Test App" is a surprisingly fully functional eBook reader.
+
+---
+
 # Readium Mobile Test App (Swift/iOS)
 
 A test app for the Swift implementation of Readium 2. Stable builds are [published on TestFlight](https://testflight.apple.com/join/lYEMEfBr).
